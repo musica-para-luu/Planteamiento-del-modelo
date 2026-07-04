@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simulador Avanzado: AMS Taipei 101</title>
-    <!-- Tailwind CSS para estilos estéticos -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js para gráficas de alta calidad -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Iconos Phosphor -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -58,7 +55,7 @@
         
         /* Efecto de resplandor para el péndulo */
         .glow-pendulum {
-            shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
         }
 
         /* Switch Toggle Custom */
@@ -68,7 +65,6 @@
 </head>
 <body class="min-h-screen p-4 md:p-6 flex flex-col">
 
-    <!-- Cabecera -->
     <header class="mb-6 text-center md:text-left flex flex-col md:flex-row justify-between items-center">
         <div>
             <h1 class="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300 flex items-center gap-3">
@@ -86,19 +82,15 @@
         </div>
     </header>
 
-    <!-- Grid Principal -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
         
-        <!-- Panel Lateral: Controles y Métricas (4 columnas) -->
         <div class="lg:col-span-4 flex flex-col gap-6">
             
-            <!-- Controles -->
             <div class="glass-panel p-6 flex-1">
                 <h2 class="text-xl font-semibold mb-6 flex items-center gap-2 border-b border-slate-700 pb-3">
                     <i class="ph ph-sliders text-blue-400"></i> Parámetros de Simulación
                 </h2>
 
-                <!-- Control: Toggle AMS -->
                 <div class="mb-8 flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-slate-700">
                     <div>
                         <h3 class="font-bold text-white flex items-center gap-2">
@@ -112,7 +104,6 @@
                     </div>
                 </div>
 
-                <!-- Control: Frecuencia Sismo -->
                 <div class="mb-6">
                     <div class="flex justify-between mb-2">
                         <label class="text-sm font-medium text-slate-300">Frecuencia del Sismo (ω)</label>
@@ -126,7 +117,6 @@
                     </div>
                 </div>
 
-                <!-- Control: Masa del AMS -->
                 <div class="mb-6">
                     <div class="flex justify-between mb-2">
                         <label class="text-sm font-medium text-slate-300">Masa del Péndulo (μ)</label>
@@ -139,7 +129,6 @@
                 </div>
             </div>
 
-            <!-- Métricas en Tiempo Real -->
             <div class="glass-panel p-6">
                 <h2 class="text-lg font-semibold mb-4 flex items-center gap-2 border-b border-slate-700 pb-3">
                     <i class="ph ph-chart-line-up text-emerald-400"></i> Análisis Estructural
@@ -164,23 +153,18 @@
             </div>
         </div>
 
-        <!-- Área Principal de Simulación (8 columnas) -->
         <div class="lg:col-span-8 flex flex-col gap-6">
             
-            <!-- Vista de Estructura -->
             <div class="glass-panel p-1 flex-1 relative min-h-[400px] flex items-center justify-center overflow-hidden">
-                <!-- Grid de fondo para aspecto de ingeniería -->
                 <div class="absolute inset-0" style="background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 20px 20px;"></div>
                 
                 <canvas id="structureCanvas" width="600" height="450" class="z-10 w-full h-full object-contain"></canvas>
                 
-                <!-- Etiqueta Flotante -->
                 <div class="absolute top-4 left-4 bg-slate-800/80 px-3 py-1 rounded text-xs text-slate-300 border border-slate-700 z-20 backdrop-blur-sm">
                     <i class="ph-fill ph-video-camera"></i> Vista Frontal (Modelo a Escala)
                 </div>
             </div>
 
-            <!-- Vista Gráfica -->
             <div class="glass-panel p-4 h-64 relative">
                 <canvas id="chartCanvas"></canvas>
             </div>
@@ -256,10 +240,7 @@
             const F_acoplamiento = isTMDActive ? k2*(x2 - x1) + c2*(v2 - v1) : 0;
 
             // Ecuaciones de movimiento
-            // a1 = (F_ext - c1*v1 - k1*x1 + F_acoplamiento) / m1
             const a1 = (F_ext - c1*v1 - k1*x1 + F_acoplamiento) / m1;
-            
-            // a2 = (-F_acoplamiento) / m2
             const a2 = isTMDActive ? (-F_acoplamiento) / m2 : 0;
 
             return [v1, a1, v2, a2];
@@ -418,46 +399,43 @@
             ctx.stroke();
 
             // Dibujar el AMS (Péndulo Dorado)
-            // Se cuelga desde el nivel 7 aprox.
-            if(isTMDActive || !isTMDActive) {
-                const anchorY = cy - 40 - (tierH * 7.5);
-                const anchorX = cx + getXOffset(anchorY);
-                
-                // El péndulo real se dibuja según su estado físico
-                const pSway = ampPendulum * visualScale;
-                const pX = cx + pSway;
-                const pY = anchorY + 50; // Longitud del cable visual
+            const anchorY = cy - 40 - (tierH * 7.5);
+            const anchorX = cx + getXOffset(anchorY);
+            
+            // El péndulo real se dibuja según su estado físico
+            const pSway = ampPendulum * visualScale;
+            const pX = cx + pSway;
+            const pY = anchorY + 50; // Longitud del cable visual
 
-                // Cable
-                ctx.beginPath();
-                ctx.moveTo(anchorX, anchorY);
-                ctx.lineTo(pX, pY);
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#94a3b8';
-                ctx.stroke();
+            // Cable
+            ctx.beginPath();
+            ctx.moveTo(anchorX, anchorY);
+            ctx.lineTo(pX, pY);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#94a3b8';
+            ctx.stroke();
 
-                // Esfera dorada
-                const radius = 12 + (parseFloat(slMass.value)); // Tamaño cambia con la masa
-                
-                // Efecto de brillo (Glow)
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
-                
-                ctx.beginPath();
-                ctx.arc(pX, pY, radius, 0, 2*Math.PI);
-                let pGrad = ctx.createRadialGradient(pX-radius/3, pY-radius/3, radius/10, pX, pY, radius);
-                pGrad.addColorStop(0, '#fef08a');
-                pGrad.addColorStop(0.5, '#fbbf24');
-                pGrad.addColorStop(1, '#b45309');
-                ctx.fillStyle = pGrad;
-                ctx.fill();
-                
-                // Borde metálico
-                ctx.shadowBlur = 0; // quitar sombra para el borde
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = '#78350f';
-                ctx.stroke();
-            }
+            // Esfera dorada
+            const radius = 12 + (parseFloat(slMass.value)); // Tamaño cambia con la masa
+            
+            // Efecto de brillo (Glow)
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
+            
+            ctx.beginPath();
+            ctx.arc(pX, pY, radius, 0, 2*Math.PI);
+            let pGrad = ctx.createRadialGradient(pX-radius/3, pY-radius/3, radius/10, pX, pY, radius);
+            pGrad.addColorStop(0, '#fef08a');
+            pGrad.addColorStop(0.5, '#fbbf24');
+            pGrad.addColorStop(1, '#b45309');
+            ctx.fillStyle = pGrad;
+            ctx.fill();
+            
+            // Borde metálico
+            ctx.shadowBlur = 0; // quitar sombra para el borde
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#78350f';
+            ctx.stroke();
 
             ctx.restore();
         }
