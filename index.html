@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Avanzado: AMS Taipei 101</title>
+    <!-- Tailwind CSS para estilos estéticos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js para gráficas de alta calidad -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Iconos Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #0f172a; 
+            color: #f8fafc;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,0.2) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,0.1) 0, transparent 50%);
+        }
+        
+        /* Contenedor estilo cristal */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+        }
+
+        /* Sliders personalizados */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 3px;
+        }
+        
+        /* Efecto de resplandor para el péndulo */
+        .glow-pendulum {
+            shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+        }
+
+        /* Switch Toggle Custom */
+        .toggle-checkbox:checked { right: 0; border-color: #10b981; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-6 flex flex-col">
+
+    <!-- Cabecera -->
+    <header class="mb-6 text-center md:text-left flex flex-col md:flex-row justify-between items-center">
+        <div>
+            <h1 class="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300 flex items-center gap-3">
+                <i class="ph ph-buildings text-blue-400"></i>
+                Simulador Dinámico de Estructuras
+            </h1>
+            <p class="text-slate-400 mt-1">Modelo de 2 Grados de Libertad con Integrador Runge-Kutta de 4to Orden (RK4)</p>
+        </div>
+        <div class="mt-4 md:mt-0 glass-panel px-6 py-3 flex items-center gap-4">
+            <div class="text-right">
+                <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Estado del Sistema</p>
+                <p id="status-text" class="text-emerald-400 font-bold">Estable (AMS Activo)</p>
+            </div>
+            <div id="status-indicator" class="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse"></div>
+        </div>
+    </header>
+
+    <!-- Grid Principal -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+        
+        <!-- Panel Lateral: Controles y Métricas (4 columnas) -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- Controles -->
+            <div class="glass-panel p-6 flex-1">
+                <h2 class="text-xl font-semibold mb-6 flex items-center gap-2 border-b border-slate-700 pb-3">
+                    <i class="ph ph-sliders text-blue-400"></i> Parámetros de Simulación
+                </h2>
+
+                <!-- Control: Toggle AMS -->
+                <div class="mb-8 flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                    <div>
+                        <h3 class="font-bold text-white flex items-center gap-2">
+                            <i class="ph ph-target text-yellow-400"></i> Amortiguador de Masa
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-1">Activar/Desactivar sistema secundario</p>
+                    </div>
+                    <div class="relative inline-block w-14 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggle" id="tmd-toggle" checked class="toggle-checkbox absolute block w-7 h-7 rounded-full bg-white border-4 border-slate-600 appearance-none cursor-pointer transition-all duration-300 z-10"/>
+                        <label for="tmd-toggle" class="toggle-label block overflow-hidden h-7 rounded-full bg-slate-600 cursor-pointer transition-colors duration-300"></label>
+                    </div>
+                </div>
+
+                <!-- Control: Frecuencia Sismo -->
+                <div class="mb-6">
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm font-medium text-slate-300">Frecuencia del Sismo (ω)</label>
+                        <span id="lbl-freq" class="text-blue-400 font-mono font-bold">3.16 rad/s</span>
+                    </div>
+                    <input type="range" id="sl-freq" min="1.0" max="6.0" step="0.01" value="3.16">
+                    <div class="flex justify-between text-[10px] text-slate-500 mt-1 uppercase font-semibold">
+                        <span>Lento</span>
+                        <span class="text-red-400">Resonancia (3.16)</span>
+                        <span>Rápido</span>
+                    </div>
+                </div>
+
+                <!-- Control: Masa del AMS -->
+                <div class="mb-6">
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm font-medium text-slate-300">Masa del Péndulo (μ)</label>
+                        <span id="lbl-mass" class="text-yellow-400 font-mono font-bold">5.0 %</span>
+                    </div>
+                    <input type="range" id="sl-mass" min="1.0" max="15.0" step="0.5" value="5.0">
+                    <p class="text-[11px] text-slate-400 mt-2 leading-tight">
+                        <i class="ph-fill ph-info text-blue-400"></i> Optimización de Den Hartog aplicada automáticamente.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Métricas en Tiempo Real -->
+            <div class="glass-panel p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2 border-b border-slate-700 pb-3">
+                    <i class="ph ph-chart-line-up text-emerald-400"></i> Análisis Estructural
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-800/80 p-4 rounded-lg border border-slate-700 text-center">
+                        <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Amplitud Máxima</p>
+                        <p class="text-2xl font-bold font-mono text-white" id="metric-amp">0.00</p>
+                        <p class="text-[10px] text-slate-500 mt-1">unidades relativas</p>
+                    </div>
+                    <div class="bg-slate-800/80 p-4 rounded-lg border border-slate-700 text-center">
+                        <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Reducción (Eficiencia)</p>
+                        <p class="text-2xl font-bold font-mono text-emerald-400" id="metric-red">0%</p>
+                        <p class="text-[10px] text-slate-500 mt-1">comparado sin AMS</p>
+                    </div>
+                </div>
+                
+                <button id="btn-reset" class="mt-4 w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition flex items-center justify-center gap-2 text-sm font-semibold border border-slate-600">
+                    <i class="ph ph-arrows-counter-clockwise"></i> Reiniciar Análisis
+                </button>
+            </div>
+        </div>
+
+        <!-- Área Principal de Simulación (8 columnas) -->
+        <div class="lg:col-span-8 flex flex-col gap-6">
+            
+            <!-- Vista de Estructura -->
+            <div class="glass-panel p-1 flex-1 relative min-h-[400px] flex items-center justify-center overflow-hidden">
+                <!-- Grid de fondo para aspecto de ingeniería -->
+                <div class="absolute inset-0" style="background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 20px 20px;"></div>
+                
+                <canvas id="structureCanvas" width="600" height="450" class="z-10 w-full h-full object-contain"></canvas>
+                
+                <!-- Etiqueta Flotante -->
+                <div class="absolute top-4 left-4 bg-slate-800/80 px-3 py-1 rounded text-xs text-slate-300 border border-slate-700 z-20 backdrop-blur-sm">
+                    <i class="ph-fill ph-video-camera"></i> Vista Frontal (Modelo a Escala)
+                </div>
+            </div>
+
+            <!-- Vista Gráfica -->
+            <div class="glass-panel p-4 h-64 relative">
+                <canvas id="chartCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * MOTOR FÍSICO Y LÓGICA DE SIMULACIÓN
+         * Implementación de Integrador Runge-Kutta 4 (RK4) para 2-DOF
+         */
+
+        // --- Variables de UI ---
+        const slFreq = document.getElementById('sl-freq');
+        const slMass = document.getElementById('sl-mass');
+        const lblFreq = document.getElementById('lbl-freq');
+        const lblMass = document.getElementById('lbl-mass');
+        const tmdToggle = document.getElementById('tmd-toggle');
+        const btnReset = document.getElementById('btn-reset');
+        
+        const metricAmp = document.getElementById('metric-amp');
+        const metricRed = document.getElementById('metric-red');
+        const statusText = document.getElementById('status-text');
+        const statusIndicator = document.getElementById('status-indicator');
+
+        // --- Parámetros del Sistema Físico ---
+        const m1 = 1000;          // Masa del edificio (fija)
+        const k1 = 10000;         // Rigidez del edificio (fija)
+        const wn1 = Math.sqrt(k1/m1); // Frecuencia natural edificio (~3.16 rad/s)
+        const zeta1 = 0.02;       // Razón de amortiguamiento estructural (2%)
+        const c1 = 2 * zeta1 * Math.sqrt(k1 * m1); // Coef. de amortiguamiento
+
+        let m2, k2, c2;           // Propiedades del AMS
+        let isTMDActive = true;
+        let forcingFreq = parseFloat(slFreq.value);
+        const F0 = 5000;          // Amplitud de la fuerza sísmica excitatriz
+
+        // Vector de estado: [x1, v1, x2, v2]
+        // x1: desplazamiento edificio, x2: desplazamiento AMS
+        let state = [0, 0, 0, 0]; 
+        let time = 0;
+        const dt = 0.016; // Paso de tiempo (~60fps)
+
+        // --- Métricas ---
+        let maxAmpCurrent = 0;
+        let maxAmpHistoricalNoTMD = 5.25; // Valor de referencia aproximado empírico
+
+        // Función para calcular parámetros óptimos del TMD (Den Hartog)
+        function updateTMDParams() {
+            const mu = parseFloat(slMass.value) / 100;
+            m2 = m1 * mu;
+            // Sintonización óptima de frecuencia
+            const f_opt = 1 / (1 + mu);
+            const w2_opt = wn1 * f_opt;
+            k2 = m2 * (w2_opt * w2_opt);
+            // Sintonización óptima de amortiguamiento
+            const zeta_opt = Math.sqrt((3 * mu) / (8 * (1 + mu)));
+            c2 = 2 * m2 * w2_opt * zeta_opt;
+        }
+
+        // Derivada del vector de estado para RK4
+        function getDerivatives(t, Y) {
+            const x1 = Y[0];
+            const v1 = Y[1];
+            const x2 = Y[2];
+            const v2 = Y[3];
+
+            // Fuerza excitatriz externa (Sismo modelado como fuerza armónica en la base/masa principal)
+            const F_ext = F0 * Math.sin(forcingFreq * t);
+
+            // Fuerza de acoplamiento entre edificio y AMS
+            // Si el AMS está inactivo, el resorte y amortiguador secundario no ejercen fuerza sobre el edificio
+            const F_acoplamiento = isTMDActive ? k2*(x2 - x1) + c2*(v2 - v1) : 0;
+
+            // Ecuaciones de movimiento
+            // a1 = (F_ext - c1*v1 - k1*x1 + F_acoplamiento) / m1
+            const a1 = (F_ext - c1*v1 - k1*x1 + F_acoplamiento) / m1;
+            
+            // a2 = (-F_acoplamiento) / m2
+            const a2 = isTMDActive ? (-F_acoplamiento) / m2 : 0;
+
+            return [v1, a1, v2, a2];
+        }
+
+        // Integrador Runge-Kutta de 4to Orden
+        function stepRK4() {
+            // Dividimos el dt visual en subpasos para mayor estabilidad numérica
+            const subSteps = 2;
+            const h = dt / subSteps;
+            
+            for(let i=0; i<subSteps; i++) {
+                const k1_vec = getDerivatives(time, state);
+                
+                const Y2 = state.map((val, idx) => val + 0.5 * h * k1_vec[idx]);
+                const k2_vec = getDerivatives(time + 0.5 * h, Y2);
+                
+                const Y3 = state.map((val, idx) => val + 0.5 * h * k2_vec[idx]);
+                const k3_vec = getDerivatives(time + 0.5 * h, Y3);
+                
+                const Y4 = state.map((val, idx) => val + h * k3_vec[idx]);
+                const k4_vec = getDerivatives(time + h, Y4);
+
+                state = state.map((val, idx) => val + (h / 6) * (k1_vec[idx] + 2*k2_vec[idx] + 2*k3_vec[idx] + k4_vec[idx]));
+                
+                // Forzar al péndulo a seguir al edificio si está apagado
+                if(!isTMDActive) {
+                    state[2] = state[0];
+                    state[3] = state[1];
+                }
+                
+                time += h;
+            }
+
+            // Actualizar Métricas
+            const currentAbsAmp = Math.abs(state[0]);
+            if (currentAbsAmp > maxAmpCurrent) {
+                maxAmpCurrent = currentAbsAmp;
+                metricAmp.innerText = maxAmpCurrent.toFixed(2);
+                
+                if (!isTMDActive && maxAmpCurrent > maxAmpHistoricalNoTMD) {
+                    maxAmpHistoricalNoTMD = maxAmpCurrent;
+                }
+                
+                if (isTMDActive) {
+                    const red = Math.max(0, ((maxAmpHistoricalNoTMD - maxAmpCurrent) / maxAmpHistoricalNoTMD) * 100);
+                    metricRed.innerText = red.toFixed(1) + "%";
+                } else {
+                    metricRed.innerText = "N/A";
+                }
+            }
+        }
+
+        // --- RENDERIZADO VISUAL (CANVAS) ---
+        const canvasObj = document.getElementById('structureCanvas');
+        const ctxObj = canvasObj.getContext('2d');
+
+        function drawTaipei(ctx, cx, cy, ampBuilding, ampPendulum) {
+            ctx.clearRect(0, 0, canvasObj.width, canvasObj.height);
+            ctx.save();
+
+            const baseW = 80;
+            const totalH = 340;
+            const tiers = 8;
+            const tierH = (totalH - 40) / tiers; // 40px para la base
+            
+            // Factor de escala visual para amplificar movimientos pequeños
+            const visualScale = 20; 
+            const sway = ampBuilding * visualScale;
+            
+            // Dibujar suelo vibrando
+            const groundSway = Math.sin(forcingFreq * time) * 10;
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, cy, canvasObj.width, canvasObj.height - cy);
+            ctx.beginPath();
+            ctx.moveTo(cx - 150 + groundSway, cy);
+            ctx.lineTo(cx + 150 + groundSway, cy);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#ef4444'; // Suelo rojo indicando energía
+            ctx.stroke();
+
+            // Sombra del edificio
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath();
+            ctx.ellipse(cx + groundSway, cy + 10, 60, 10, 0, 0, 2*Math.PI);
+            ctx.fill();
+
+            // Lógica de pandeo: curva cuadrática
+            function getXOffset(yPos) {
+                // Normalizar altura de 0 (base) a 1 (techo)
+                const hNorm = (cy - yPos) / totalH;
+                // El pandeo no es lineal, es parabólico
+                return sway * (hNorm * hNorm); 
+            }
+
+            // Dibujar Estructura (Pagoda)
+            // Color base: verde agua oscuro/cristalino característico del Taipei 101
+            
+            // Base
+            ctx.fillStyle = '#0f766e'; // teal oscuro
+            ctx.strokeStyle = '#5eead4'; // borde claro
+            ctx.lineWidth = 1;
+            
+            let currentY = cy;
+            ctx.fillRect(cx - baseW/2, currentY - 40, baseW, 40);
+            ctx.strokeRect(cx - baseW/2, currentY - 40, baseW, 40);
+            currentY -= 40;
+
+            // Tiers (Secciones acampanadas)
+            for(let i=1; i<=tiers; i++) {
+                const bottomY = currentY;
+                const topY = currentY - tierH;
+                
+                const offBot = getXOffset(bottomY);
+                const offTop = getXOffset(topY);
+
+                const wBot = baseW - (i-1)*3;
+                const wTop = baseW - i*3 + 15; // Ensanchamiento arriba
+                
+                ctx.beginPath();
+                ctx.moveTo(cx - wBot/2 + offBot, bottomY);
+                ctx.lineTo(cx + wBot/2 + offBot, bottomY);
+                ctx.lineTo(cx + wTop/2 + offTop, topY);
+                ctx.lineTo(cx - wTop/2 + offTop, topY);
+                ctx.closePath();
+                
+                // Gradiente para efecto cristal/3D
+                let grad = ctx.createLinearGradient(cx - wTop/2 + offTop, 0, cx + wTop/2 + offTop, 0);
+                grad.addColorStop(0, '#0d9488'); // teal-600
+                grad.addColorStop(0.5, '#2dd4bf'); // teal-400
+                grad.addColorStop(1, '#115e59'); // teal-800
+                
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.stroke();
+                
+                // Líneas decorativas
+                ctx.beginPath();
+                ctx.moveTo(cx + offBot, bottomY);
+                ctx.lineTo(cx + offTop, topY);
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.stroke();
+                ctx.strokeStyle = '#5eead4'; // restaurar
+
+                currentY = topY;
+            }
+
+            // Antena / Aguja
+            const spireH = 50;
+            const offSpire = getXOffset(currentY - spireH);
+            ctx.beginPath();
+            ctx.moveTo(cx + getXOffset(currentY), currentY);
+            ctx.lineTo(cx + offSpire, currentY - spireH);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.stroke();
+
+            // Dibujar el AMS (Péndulo Dorado)
+            // Se cuelga desde el nivel 7 aprox.
+            if(isTMDActive || !isTMDActive) {
+                const anchorY = cy - 40 - (tierH * 7.5);
+                const anchorX = cx + getXOffset(anchorY);
+                
+                // El péndulo real se dibuja según su estado físico
+                const pSway = ampPendulum * visualScale;
+                const pX = cx + pSway;
+                const pY = anchorY + 50; // Longitud del cable visual
+
+                // Cable
+                ctx.beginPath();
+                ctx.moveTo(anchorX, anchorY);
+                ctx.lineTo(pX, pY);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#94a3b8';
+                ctx.stroke();
+
+                // Esfera dorada
+                const radius = 12 + (parseFloat(slMass.value)); // Tamaño cambia con la masa
+                
+                // Efecto de brillo (Glow)
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
+                
+                ctx.beginPath();
+                ctx.arc(pX, pY, radius, 0, 2*Math.PI);
+                let pGrad = ctx.createRadialGradient(pX-radius/3, pY-radius/3, radius/10, pX, pY, radius);
+                pGrad.addColorStop(0, '#fef08a');
+                pGrad.addColorStop(0.5, '#fbbf24');
+                pGrad.addColorStop(1, '#b45309');
+                ctx.fillStyle = pGrad;
+                ctx.fill();
+                
+                // Borde metálico
+                ctx.shadowBlur = 0; // quitar sombra para el borde
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#78350f';
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // --- RENDERIZADO DE GRÁFICA (Chart.js) ---
+        const ctxChart = document.getElementById('chartCanvas').getContext('2d');
+        const maxDataPoints = 200;
+        
+        // Inicializar arreglos de datos vacíos
+        const labels = Array(maxDataPoints).fill('');
+        const dataEdificio = Array(maxDataPoints).fill(0);
+        const dataAMS = Array(maxDataPoints).fill(0);
+
+        const chart = new Chart(ctxChart, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Edificio',
+                        data: dataEdificio,
+                        borderColor: '#3b82f6', // blue-500
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Amortiguador (AMS)',
+                        data: dataAMS,
+                        borderColor: '#fbbf24', // amber-400
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        borderDash: [5, 5]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false, // Fundamental para rendimiento en tiempo real
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        labels: { color: '#cbd5e1', usePointStyle: true, boxWidth: 8 }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: false // Ocultar eje X temporal
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#94a3b8' },
+                        suggestedMin: -6,
+                        suggestedMax: 6
+                    }
+                }
+            }
+        });
+
+        function updateChart() {
+            // Empujar nuevos datos
+            dataEdificio.push(state[0]);
+            dataEdificio.shift();
+
+            if (isTMDActive) {
+                dataAMS.push(state[2]);
+            } else {
+                dataAMS.push(null); // No dibujar línea si está desactivado
+            }
+            dataAMS.shift();
+
+            chart.update(); // Sin parámetros extra, la animación está en false globalmente
+        }
+
+        // --- BUCLE PRINCIPAL ---
+        function animate() {
+            stepRK4();
+            
+            // Dibujo de física
+            drawTaipei(ctxObj, canvasObj.width/2, canvasObj.height - 20, state[0], state[2]);
+            
+            // Actualizar gráfica cada 2 frames para optimizar
+            if(Math.floor(time/dt) % 2 === 0) {
+                updateChart();
+            }
+
+            // Cambiar estado visual según la amplitud
+            if(Math.abs(state[0]) > 4) {
+                statusText.innerText = "PELIGRO: Resonancia";
+                statusText.className = "text-red-400 font-bold";
+                statusIndicator.className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-pulse";
+            } else if (Math.abs(state[0]) > 2) {
+                statusText.innerText = "Advertencia: Oscilación Moderada";
+                statusText.className = "text-yellow-400 font-bold";
+                statusIndicator.className = "w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.8)]";
+            } else {
+                statusText.innerText = isTMDActive ? "Estable (AMS Activo)" : "Estable (Sismo Leve)";
+                statusText.className = "text-emerald-400 font-bold";
+                statusIndicator.className = "w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]";
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // --- EVENT LISTENERS ---
+        slFreq.addEventListener('input', (e) => {
+            forcingFreq = parseFloat(e.target.value);
+            lblFreq.innerText = forcingFreq.toFixed(2) + " rad/s";
+        });
+
+        slMass.addEventListener('input', (e) => {
+            lblMass.innerText = parseFloat(e.target.value).toFixed(1) + " %";
+            updateTMDParams();
+        });
+
+        tmdToggle.addEventListener('change', (e) => {
+            isTMDActive = e.target.checked;
+            
+            // Reseteo suave del péndulo al estado del edificio
+            if(isTMDActive) {
+                state[2] = state[0];
+                state[3] = state[1];
+            } else {
+                // Borrar línea amarilla de la gráfica instántaneamente
+                for(let i=0; i<dataAMS.length; i++) dataAMS[i] = null;
+                metricRed.innerText = "N/A";
+            }
+            maxAmpCurrent = 0; // Resetear métrica al cambiar estado
+        });
+
+        btnReset.addEventListener('click', () => {
+            state = [0, 0, 0, 0];
+            time = 0;
+            maxAmpCurrent = 0;
+            metricAmp.innerText = "0.00";
+            for(let i=0; i<maxDataPoints; i++) {
+                dataEdificio[i] = 0;
+                dataAMS[i] = isTMDActive ? 0 : null;
+            }
+        });
+
+        // Inicializar y arrancar
+        updateTMDParams();
+        requestAnimationFrame(animate);
+
+    </script>
+</body>
+</html>
